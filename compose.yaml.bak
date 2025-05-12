@@ -1,0 +1,17 @@
+services:
+  python-app:
+    build:
+      context: .
+    container_name: python-app
+    restart: unless-stopped
+    init: true
+    # env_file: ./.env  # Uncomment if .env file exists
+    ports:
+      - "7860:7860"  # Gradio web UI (default)
+    # If you want to run a different entrypoint, override the command here
+    # command: ["python", "app.py", "--enable-v1", "--enable-v2"]
+    # networks: [default]  # Only needed if you add more services
+
+# No external services (databases, cache, etc.) detected in documentation or code
+# No persistent volumes required for this application
+# No additional networks needed for a single service

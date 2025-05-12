@@ -1,0 +1,54 @@
+# syntax=docker/dockerfile:1
+
+FROM python:3.10-slim AS base
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies required for audio processing and building wheels
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        ffmpeg \
+        libsndfile1 \
+        git \
+        && rm -rf /var/lib/apt/lists/*
+
+# Create a non-root user
+RUN useradd -m seedvcuser
+
+# Builder stage: install dependencies in a venv
+FROM base AS builder
+
+# Copy only requirements.txt first for better cache usage
+COPY --link requirements.txt ./
+
+# Create venv and install dependencies
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m venv .venv && \
+    .venv/bin/pip install --upgrade pip && \
+    .venv/bin/pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application code
+COPY --link . .
+
+# Final stage: minimal runtime image
+FROM base AS final
+
+# Copy app code and venv from builder
+COPY --from=builder /app /app
+COPY --from=builder /app/.venv /app/.venv
+
+# Set environment variables
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONUNBUFFERED=1
+
+# Set permissions and switch to non-root user
+RUN chown -R seedvcuser:seedvcuser /app
+USER seedvcuser
+
+# Expose Gradio default port
+EXPOSE 7860
+
+# Default command: run the main web UI (can be overridden)
+CMD ["python", "app.py", "--enable-v1", "--enable-v2"]
